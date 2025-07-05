@@ -1,0 +1,79 @@
+\documentclass[notoc]{tufte-book}
+\usepackage[normalem]{ulem}
+\usepackage{soul}
+\usepackage{hyperref}
+%\usepackage{todonotes}
+\usepackage{xcolor}
+\setcounter{tocdepth}{10}
+\usepackage{xargs}
+\usepackage{amssymb}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+}
+%{\noindent\textbf{#2}\marginnote{#1}\\}{\vspace{0.5cm}}
+\newcommand{\nuni}{\marginnote{--- Not Urgent, Not Important}}
+\newcommand{\uni}{\marginnote{--- Urgent, Not Important}}
+\newcommand{\nui}{\marginnote{--- Not Urgent, Important}}
+\newcommand{\ui}{\marginnote{--- Urgent, Important}}
+
+\newcommand{\mn}[1]{\marginnote{#1}}
+%\newcommandx{\unsure}[2][1=]{\todo[linecolor=OliveGreen,backgroundcolor=OliveGreen!25,bordercolor=OliveGreen,#1]{#2}}
+%\newcommandx{\otask}[2][1=]{\todo[noline, color=white, textcolor=white, bordercolor=white,#1]{#2}}
+%\newcommandx{itask}[2][1=]{\todo[color=white,bordercolor=white,inline,#1]{#2}}
+
+%\newcommandx{\itask}[2][1=]{\todo[color=white,bordercolor=white,inline,#1]{\(\square\)~#2}}
+%\newcommandx{\itask}[2][1=]{\todo[color=white,bordercolor=white,inline,#1]{#2}}
+
+
+% Define the counter
+\newcounter{todonotesnumber}
+\makeatletter
+
+\SetupKeyvalOptions{family=todo,prefix=todo@}
+\define@key{todo}{color}{\def\todocolor{#1}}
+\newif\ifTodoIsDone
+\define@key{todo}{done}[true]{\TodoIsDonetrue}
+% Macro to add a todo/task
+\newcommand{\todo}[2][]{%
+  % Increment the counter and make it referenceable
+  \refstepcounter{todonotesnumber}%
+  \phantomsection % Create an anchor here
+  \def\todocolor{blue}%
+    \TodoIsDonefalse%
+  % Parse key=val options
+  \setkeys{todo}{#1}%
+	\ifTodoIsDone
+    % Do not write to .tdo file
+	  \addcontentsline{odo}{section}{~\thetodonotesnumber: \textcolor{\todocolor}{~ #2}}%
+  \else
+  % Add to Table of Contents
+	  \addcontentsline{tdo}{section}{~\thetodonotesnumber:\textcolor{\todocolor}{~ #2}}%
+\fi
+  % Display in text
+  \textbf{~\thetodonotesnumber:}~ #2\par
+}
+
+\newcommand{\listoftodos}{%
+  \chapter{List of Todos}
+  \@starttoc{tdo}
+}
+\newcommand{\listofdonetodos}{%
+  \chapter{List of Done Todos}
+  \@starttoc{odo}
+}
+\makeatother
+\newcommand{\backlog}{\todo[color=OliveGreen]}
+
+
+\begin{document}
+
+\chapter{Journal}
+\input{entries.tex}
+\newpage
+\listoftodos
+\newpage
+\listofdonetodos
+\end{document}
