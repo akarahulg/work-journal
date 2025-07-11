@@ -38,6 +38,10 @@
 \define@key{todo}{color}{\def\todocolor{#1}}
 \newif\ifTodoIsDone
 \define@key{todo}{done}[true]{\TodoIsDonetrue}
+\newif\ifTodoIsStruck
+\define@key{todo}{strike}[true]{\TodoIsStrucktrue}
+
+\newcommand{\todotextformat}[1]{#1}
 % Macro to add a todo/task
 \newcommand{\todo}[2][]{%
   % Increment the counter and make it referenceable
@@ -47,6 +51,11 @@
     \TodoIsDonefalse%
   % Parse key=val options
   \setkeys{todo}{#1}%
+\ifTodoIsStruck
+  \renewcommand{\todotextformat}[1]{\sout{##1}}%
+\else
+  \renewcommand{\todotextformat}[1]{##1}%
+\fi
 	\ifTodoIsDone
     % Do not write to .tdo file
 	  \addcontentsline{odo}{section}{~\thetodonotesnumber: \textcolor{\todocolor}{~ #2}}%
@@ -55,7 +64,7 @@
 	  \addcontentsline{tdo}{section}{~\thetodonotesnumber:\textcolor{\todocolor}{~ #2}}%
 \fi
   % Display in text
-  \textbf{~\thetodonotesnumber:}~ #2\par
+\par\noindent\textbf{~\thetodonotesnumber:}~ \todotextformat{#2}\par
 }
 
 \newcommand{\listoftodos}{%
@@ -77,6 +86,5 @@
 \input{entries.tex}
 \newpage
 \listoftodos
-\newpage
 \listofdonetodos
 \end{document}
