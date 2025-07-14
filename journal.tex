@@ -67,6 +67,24 @@
 \par\noindent\textbf{~\thetodonotesnumber:}~ \todotextformat{#2}\par
 }
 
+\newcommand{\backlog}[2][]{%
+  \refstepcounter{todonotesnumber}%
+  \phantomsection
+  \def\todocolor{OliveGreen}%
+  \TodoIsDonefalse%
+  \TodoIsStruckfalse%
+  \setkeys{todo}{#1}%
+  \ifTodoIsStruck
+    \renewcommand{\todotextformat}[1]{\sout{##1}}%
+  \else
+    \renewcommand{\todotextformat}[1]{##1}%
+  \fi
+  % Add to Backlog ToC
+  \addcontentsline{bgo}{section}{~\thetodonotesnumber:\textcolor{\todocolor}{~ #2}}%
+  % Display in text
+  \par\noindent\textbf{~\thetodonotesnumber:}~ \todotextformat{#2}\par
+}
+
 \newcommand{\listoftodos}{%
   \chapter{List of Todos}
   \@starttoc{tdo}
@@ -75,8 +93,13 @@
   \chapter{List of Done Todos}
   \@starttoc{odo}
 }
+
+\newcommand{\listofbacklogs}{%
+  \chapter{List of Backlog Tasks}
+  \@starttoc{bgo}
+}
+
 \makeatother
-\newcommand{\backlog}{\todo[color=OliveGreen]}
 \newcommand{\now}{\todo[color=red]}
 
 
@@ -87,4 +110,5 @@
 \newpage
 \listoftodos
 \listofdonetodos
+\listofbacklogs
 \end{document}
