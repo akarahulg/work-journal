@@ -1,113 +1,154 @@
-\documentclass[notoc]{tufte-book}
-\usepackage[normalem]{ulem}
-\usepackage{soul}
-\usepackage{hyperref}
-%\usepackage{todonotes}
+\documentclass{tufte-book}
+
+% --- FONT, ENCODING, AND LAYOUT PACKAGES ---
+\usepackage[T1]{fontenc}
+\usepackage[normalem]{ulem} 
+\usepackage{soul}           
+\usepackage{arev}           
+\usepackage{amssymb}        
 \usepackage{xcolor}
-\setcounter{tocdepth}{10}
-\usepackage{xargs}
-\usepackage{amssymb}
+\usepackage{xargs}          
+
+% --- DATETIME & ZREF ---
+\usepackage[en-US]{datetime2}
+\usepackage{zref-user}
+
+% --- HYPERREF SETUP ---
+\usepackage{hyperref}
 \hypersetup{
     colorlinks=true,
     linkcolor=blue,
     filecolor=magenta,      
     urlcolor=cyan,
-	bookmarksdepth=subsection,
+    bookmarksdepth=subsection,
 }
-%{\noindent\textbf{#2}\marginnote{#1}\\}{\vspace{0.5cm}}
+
+% --- CUSTOM COLOR DEFINITIONS ---
+\definecolor{TaskImp}{HTML}{D9534F}     
+\definecolor{TaskDone}{HTML}{428BCA}    
+\definecolor{TaskNote}{HTML}{5BC0DE}    
+\definecolor{TaskThought}{HTML}{777777} 
+\definecolor{SubTaskDone}{HTML}{407076} 
+\definecolor{SubTask}{HTML}{333B3E}     
+\definecolor{Backlog}{HTML}{5CB85C}     
+\definecolor{TaskPlan}{HTML}{8A2BE2}
+
+% --- TUFTE MARGINNOTE COMMANDS (Unchanged) ---
 \newcommand{\nuni}{\marginnote{--- Not Urgent, Not Important}}
 \newcommand{\uni}{\marginnote{--- Urgent, Not Important}}
 \newcommand{\nui}{\marginnote{--- Not Urgent, Important}}
 \newcommand{\ui}{\marginnote{--- Urgent, Important}}
-
 \newcommand{\mn}[1]{\marginnote{--- #1}}
 \newcommand{\distraction}[1]{#1 \mn{distraction}}
-%\newcommandx{\unsure}[2][1=]{\todo[linecolor=OliveGreen,backgroundcolor=OliveGreen!25,bordercolor=OliveGreen,#1]{#2}}
-%\newcommandx{\otask}[2][1=]{\todo[noline, color=white, textcolor=white, bordercolor=white,#1]{#2}}
-%\newcommandx{itask}[2][1=]{\todo[color=white,bordercolor=white,inline,#1]{#2}}
 
-%\newcommandx{\itask}[2][1=]{\todo[color=white,bordercolor=white,inline,#1]{\(\square\)~#2}}
-%\newcommandx{\itask}[2][1=]{\todo[color=white,bordercolor=white,inline,#1]{#2}}
+% =========================================================================
+% --- CORE TASK MANAGEMENT SYSTEM (v6.2 - Definitive Fix) ---
+% =========================================================================
 
-
-% Define the counter
-\newcounter{todonotesnumber}
 \makeatletter
 
+% --- SETUP ---
+\newcounter{todonotesnumber}
+\setcounter{tocdepth}{10} 
+\zref@newprop{entrydate}[unknown]{\textbf{??}}
+\AtBeginDocument{\DTMsetup{dateformat=long}}
+
+% --- KEY-VALUE OPTIONS FOR TASKS ---
 \SetupKeyvalOptions{family=todo,prefix=todo@}
 \define@key{todo}{color}{\def\todocolor{#1}}
 \newif\ifTodoIsDone
 \define@key{todo}{done}[true]{\TodoIsDonetrue}
 \newif\ifTodoIsStruck
 \define@key{todo}{strike}[true]{\TodoIsStrucktrue}
+\define@key{todo}{donedate}{\def\tododonedate{#1}}
+\define@key{todo}{plan}{\def\todoplandate{#1}} 
 
 \newcommand{\todotextformat}[1]{#1}
-% Macro to add a todo/task
+
+% --- MAIN TODO COMMAND ---
 \newcommand{\todo}[2][]{%
-  % Increment the counter and make it referenceable
-  \refstepcounter{todonotesnumber}%
-  \phantomsection % Create an anchor here
-  \def\todocolor{blue}%
-    \TodoIsDonefalse%
-  % Parse key=val options
+  \refstepcounter{todonotesnumber}\phantomsection
+  \def\todocolor{black}\def\tododonedate{}\def\todoplandate{}\TodoIsDonefalse\TodoIsStruckfalse
   \setkeys{todo}{#1}%
-\ifTodoIsStruck
-  \renewcommand{\todotextformat}[1]{\sout{##1}}%
-\else
-  \renewcommand{\todotextformat}[1]{##1}%
-\fi
-	\ifTodoIsDone
-    % Do not write to .tdo file
-	  \addcontentsline{odo}{section}{~\thetodonotesnumber: \textcolor{\todocolor}{~ #2}}%
-  \else
-  % Add to Table of Contents
-	  \addcontentsline{tdo}{section}{~\thetodonotesnumber:\textcolor{\todocolor}{~ #2}}%
-\fi
-  % Display in text
-\par\noindent\textbf{~\thetodonotesnumber:}~ \todotextformat{#2}\par
-}
-
-\newcommand{\backlog}[2][]{%
-  \refstepcounter{todonotesnumber}%
-  \phantomsection
-  \def\todocolor{OliveGreen}%
-  \TodoIsDonefalse%
-  \TodoIsStruckfalse%
-  \setkeys{todo}{#1}%
-  \ifTodoIsStruck
-    \renewcommand{\todotextformat}[1]{\sout{##1}}%
-  \else
-    \renewcommand{\todotextformat}[1]{##1}%
+  
+  \ifTodoIsStruck\renewcommand{\todotextformat}[1]{\sout{##1}}\else\renewcommand{\todotextformat}[1]{##1}\fi
+  \def\plantag{}
+  
+  \ifx\todoplandate\empty\else
+      \def\plantag{\textcolor{TaskPlan}{\small~[Plan: \todoplandate]}}%
+      \ifx\todocolor\unmodified\def\todocolor{TaskPlan}\fi
   \fi
-  % Add to Backlog ToC
-  \addcontentsline{bgo}{section}{~\thetodonotesnumber:\textcolor{\todocolor}{~ #2}}%
-  % Display in text
-  \par\noindent\textbf{~\thetodonotesnumber:}~ \todotextformat{#2}\par
+  
+  \ifTodoIsDone
+    \ifx\tododonedate\empty\edef\tododonedate{\zref@getcurrent{entrydate}}\fi
+    \def\completiontag{\textcolor{TaskDone}{\small~[Completed: \tododonedate]}}%
+    % --- DEFINITIVE FIX: Force expansion before writing to file ---
+    \protected@edef\listentry{\completiontag~\thetodonotesnumber: #2}%
+    \addcontentsline{odo}{section}{\listentry}%
+  \else
+    \def\creationtag{}
+    \edef\creationdate{\zref@getcurrent{entrydate}}
+    \ifx\creationdate\empty\else\def\creationtag{\small~[Created: \creationdate]}\fi
+    % --- DEFINITIVE FIX: Force expansion before writing to file ---
+    \protected@edef\listentry{\creationtag~\thetodonotesnumber: #2}%
+    \addcontentsline{tdo}{section}{\listentry}%
+  \fi
+
+  \ifTodoIsDone
+    \def\taskicon{\boxtimes}\def\taskcolor{TaskDone}%
+  \else
+    \def\taskicon{\square}\def\taskcolor{\todocolor}%
+  \fi
+  \par\noindent\textbf{\thetodonotesnumber.}~{\Large\raisebox{-0.1em}{\textcolor{\taskcolor}{$\taskicon$}}}~\textcolor{\taskcolor}{\todotextformat{#2}}\plantag\par
 }
 
-\newcommand{\listoftodos}{%
-  \chapter{List of Todos}
-  \@starttoc{tdo}
-}
-\newcommand{\listofdonetodos}{%
-  \chapter{List of Done Todos}
-  \@starttoc{odo}
+% --- Backlog command with list date logic ---
+\newcommand{\backlog}[2][]{%
+    \refstepcounter{todonotesnumber}\phantomsection
+    \def\todocolor{Backlog}\def\todoplandate{}\setkeys{todo}{#1}%
+    \def\plantag{}\def\datetag{}
+    \ifx\todoplandate\empty
+        \edef\creationdate{\zref@getcurrent{entrydate}}
+        \ifx\creationdate\empty\else\def\datetag{\small~[Created: \creationdate]}\fi
+    \else
+        \def\plantag{\textcolor{TaskPlan}{\small~[Plan: \todoplandate]}}%
+        \def\datetag{\textcolor{TaskPlan}{\small~[Plan: \todoplandate]}}%
+    \fi
+    % --- DEFINITIVE FIX: Force expansion before writing to file ---
+    \protected@edef\listentry{\datetag~\thetodonotesnumber: #2}%
+    \addcontentsline{bgo}{section}{\listentry}%
+    \par\noindent\textbf{\thetodonotesnumber.}~{\Large\raisebox{-0.1em}{\textcolor{\todocolor}{$\square$}}}~\textcolor{\todocolor}{#2}\plantag\par
 }
 
-\newcommand{\listofbacklogs}{%
-  \chapter{List of Backlog Tasks}
-  \@starttoc{bgo}
+% --- Helper commands (unchanged) ---
+\newcommand{\imptodo}[2][]{\todo[color=TaskImp, #1]{#2}}
+\newcommand{\now}[2][]{\imptodo[#1]{#2}}
+\newcommandx{\subtodo}[2][1=]{\TodoIsDonefalse\setkeys{todo}{#1}\ifTodoIsDone\def\subicon{\checkmark}\def\subcolor{SubTaskDone}\else\def\subicon{\square}\def\subcolor{Task}\fi\par\noindent\hspace{2.5em}{\small\raisebox{0.05em}{\textcolor{\subcolor}{$\subicon$}}}~\textcolor{\subcolor}{#2}\par}
+\newcommand{\tasknote}[1]{\par\noindent\hspace{2.5em}\textcolor{TaskNote}{-- \textit{#1}}\par}
+\newcommand{\taskthought}[1]{\par\noindent\hspace{2.5em}\textcolor{TaskThought}{-- \textit{#1}}\par}
+
+% --- COMMANDS TO GENERATE LISTS ---
+\newcommand{\listoftodos}{\section*{List of Todos}\@starttoc{tdo}}
+\newcommand{\listofdonetodos}{\section*{List of Done Todos}\@starttoc{odo}}
+\newcommand{\listofbacklogs}{\section*{List of Backlog Tasks}\@starttoc{bgo}}
+
+% --- The robust command for date headings ---
+\DeclareRobustCommand{\entrydate}[1]{%
+    \edef\myDateString{\DTMweekdayname{#1}, \DTMlongdate{#1}}%
+    \subsection*{\myDateString}%
+    \zref@setcurrent{entrydate}{#1}%
 }
 
 \makeatother
-\newcommand{\now}{\todo[color=red]}
-
+% =========================================================================
 
 \begin{document}
 
-\chapter{Journal}
-\input{entries.tex}
-\newpage
+% --- NEW STRUCTURE: Lists at the beginning ---
+
+\chapter*{Journal Entries} 
+\input{entries/2025-10.tex} % Your entry file
+
 \listoftodos
 \listofdonetodos
 \listofbacklogs
