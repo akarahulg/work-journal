@@ -10,8 +10,8 @@
 \usepackage{xargs}          
 
 % --- DATETIME & ZREF ---
-% --- DEFINITIVE FIX: Use the key-value syntax 'dateformat=long' ---
-\usepackage[en-US, dateformat=long]{datetime2} 
+% \usepackage[en-US, style=dateformat=long]{datetime2} 
+\usepackage[en-US]{datetime2} 
 \usepackage{zref-user}
 
 % --- HYPERREF SETUP ---
@@ -44,7 +44,7 @@
 \newcommand{\distraction}[1]{#1 \mn{distraction}}
 
 % =========================================================================
-% --- CORE TASK MANAGEMENT SYSTEM (v7.2 - Corrected Package Option) ---
+% --- CORE TASK MANAGEMENT SYSTEM (DEFINITIVE CORRECTED VERSION) ---
 % =========================================================================
 
 \makeatletter
@@ -89,25 +89,25 @@
     % --- LOGIC FOR DONE TASKS LIST ---
     \ifx\tododonedate\empty\edef\tododonedate{\zref@getcurrent{entrydate}}\fi
     \ifx\tododonedate\lastOdoDate\else
-        \protected@edef\dateheadingtext{\noexpand\normalfont\noexpand\bfseries\noexpand\color{DateHeading}--- Completed on \DTMlongdate{\tododonedate} ---}
+        % FIX: Write ONLY plain text to the list file.
+        \protected@edef\dateheadingtext{--- Completed on \DTMlongdate{\tododonedate} ---}
         \addcontentsline{odo}{subsection}{\dateheadingtext}
         \xdef\lastOdoDate{\tododonedate}
     \fi
     \protected@edef\listentry{\thetodonotesnumber: #2}%
     \addcontentsline{odo}{section}{\listentry}%
-
     \def\taskicon{\boxtimes}\def\taskcolor{TaskDone}%
   \else
     % --- LOGIC FOR TODO TASKS LIST ---
     \edef\creationdate{\zref@getcurrent{entrydate}}
     \ifx\creationdate\lastTdoDate\else
-        \protected@edef\dateheadingtext{\noexpand\normalfont\noexpand\bfseries\noexpand\color{DateHeading}--- Created on \DTMlongdate{\creationdate} ---}
+        % FIX: Write ONLY plain text to the list file.
+        \protected@edef\dateheadingtext{--- Created on \DTMlongdate{\creationdate} ---}
         \addcontentsline{tdo}{subsection}{\dateheadingtext}
         \xdef\lastTdoDate{\creationdate}
     \fi
     \protected@edef\listentry{\thetodonotesnumber: #2}%
     \addcontentsline{tdo}{section}{\listentry}%
-
     \def\taskicon{\square}\def\taskcolor{\todocolor}%
   \fi
 
@@ -130,7 +130,8 @@
     \fi
 
     \ifx\thedate\lastBgoDate\else
-        \protected@edef\dateheadingtext{\noexpand\normalfont\noexpand\bfseries\noexpand\color{DateHeading}--- \datetype \space \DTMlongdate{\thedate} ---}
+        % FIX: Write ONLY plain text to the list file.
+        \protected@edef\dateheadingtext{--- \datetype \space \DTMlongdate{\thedate} ---}
         \addcontentsline{bgo}{subsection}{\dateheadingtext}
         \xdef\lastBgoDate{\thedate}
     \fi
@@ -147,13 +148,36 @@
 \newcommand{\taskthought}[1]{\par\noindent\hspace{2.5em}\textcolor{TaskThought}{-- \textit{#1}}\par}
 
 % --- COMMANDS TO GENERATE LISTS ---
-\newcommand{\listoftodos}{\section*{List of Todos}\@starttoc{tdo}}
-\newcommand{\listofdonetodos}{\section*{List of Done Todos}\@starttoc{odo}}
-\newcommand{\listofbacklogs}{\section*{List of Backlog Tasks}\@starttoc{bgo}}
+\newcommand{\generatelist}[2]{%
+    \section*{#1}%
+    \begingroup
+    % For task items (level 1)
+    \renewcommand*{\l@section}[2]{%
+        \ifnum 1>\c@tocdepth \else
+            \par\noindent\leftskip=2.5em ##1\par
+        \fi
+    }
+    % For date headings (level 2)
+    \renewcommand*{\l@subsection}[2]{%
+        \ifnum 2>\c@tocdepth \else
+            \addvspace{0.5\baselineskip}\par\noindent
+            % FIX: Apply formatting HERE, during typesetting.
+            {\normalfont\bfseries\color{DateHeading}##1}\par
+        \fi
+    }
+    \@starttoc{#2}%
+    \endgroup
+}
 
-% --- The robust command for date headings in the main document ---
-\DeclareRobustCommand{\entrydate}[1]{%
-    \edef\myDateString{\DTMweekdayname{#1}, \DTMlongdate{#1}}%
+\newcommand{\listoftodos}{\generatelist{List of Todos}{tdo}}
+\newcommand{\listofdonetodos}{\generatelist{List of Done Todos}{odo}}
+\newcommand{\listofbacklogs}{\generatelist{List of Backlog Tasks}{bgo}}
+
+
+% --- FIX: Use a unique command name to avoid package conflicts ---
+\DeclareRobustCommand{\journaldate}[1]{%
+    % \edef\myDateString{\DTMweekdayname{#1}, \DTMlongdate{#1}}%
+    \edef\myDateString{\DTMweekdayname{#1}}%
     \subsection*{\myDateString}%
     \zref@setcurrent{entrydate}{#1}%
     \gdef\lastTdoDate{}\gdef\lastOdoDate{}\gdef\lastBgoDate{}%
@@ -164,14 +188,17 @@
 
 \begin{document}
 
+% --- Journal entries follow ---
+\chapter*{Journal Entries} 
+
+% To make this example fully compilable, a dummy entries.tex is created.
+% You must use \journaldate instead of \entrydate in your actual file.
+\input{entries.tex} 
 % --- Lists at the beginning ---
 \chapter*{Task Lists}
 \listoftodos
 \listofdonetodos
 \listofbacklogs
 
-% --- Journal entries follow ---
-\chapter*{Journal Entries} 
-\input{entries.tex} % Use your actual entry file
 
 \end{document}
