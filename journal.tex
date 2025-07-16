@@ -10,7 +10,8 @@
 \usepackage{xargs}          
 
 % --- DATETIME & ZREF ---
-\usepackage[en-US]{datetime2}
+% --- DEFINITIVE FIX: Use the key-value syntax 'dateformat=long' ---
+\usepackage[en-US, dateformat=long]{datetime2} 
 \usepackage{zref-user}
 
 % --- HYPERREF SETUP ---
@@ -29,9 +30,10 @@
 \definecolor{TaskNote}{HTML}{5BC0DE}    
 \definecolor{TaskThought}{HTML}{777777} 
 \definecolor{SubTaskDone}{HTML}{407076} 
-\definecolor{SubTask}{HTML}{333B3E}     
+\definecolor{Task}{HTML}{333B3E}     
 \definecolor{Backlog}{HTML}{5CB85C}     
 \definecolor{TaskPlan}{HTML}{8A2BE2}
+\definecolor{DateHeading}{HTML}{666666}
 
 % --- TUFTE MARGINNOTE COMMANDS (Unchanged) ---
 \newcommand{\nuni}{\marginnote{--- Not Urgent, Not Important}}
@@ -42,7 +44,7 @@
 \newcommand{\distraction}[1]{#1 \mn{distraction}}
 
 % =========================================================================
-% --- CORE TASK MANAGEMENT SYSTEM (v6.2 - Definitive Fix) ---
+% --- CORE TASK MANAGEMENT SYSTEM (v7.2 - Corrected Package Option) ---
 % =========================================================================
 
 \makeatletter
@@ -51,7 +53,11 @@
 \newcounter{todonotesnumber}
 \setcounter{tocdepth}{10} 
 \zref@newprop{entrydate}[unknown]{\textbf{??}}
-\AtBeginDocument{\DTMsetup{dateformat=long}}
+
+% --- Macros to track the last date printed in each list ---
+\newcommand{\lastTdoDate}{}
+\newcommand{\lastOdoDate}{}
+\newcommand{\lastBgoDate}{}
 
 % --- KEY-VALUE OPTIONS FOR TASKS ---
 \SetupKeyvalOptions{family=todo,prefix=todo@}
@@ -80,25 +86,31 @@
   \fi
   
   \ifTodoIsDone
+    % --- LOGIC FOR DONE TASKS LIST ---
     \ifx\tododonedate\empty\edef\tododonedate{\zref@getcurrent{entrydate}}\fi
-    \def\completiontag{\textcolor{TaskDone}{\small~[Completed: \tododonedate]}}%
-    % --- DEFINITIVE FIX: Force expansion before writing to file ---
-    \protected@edef\listentry{\completiontag~\thetodonotesnumber: #2}%
+    \ifx\tododonedate\lastOdoDate\else
+        \protected@edef\dateheadingtext{\noexpand\normalfont\noexpand\bfseries\noexpand\color{DateHeading}--- Completed on \DTMlongdate{\tododonedate} ---}
+        \addcontentsline{odo}{subsection}{\dateheadingtext}
+        \xdef\lastOdoDate{\tododonedate}
+    \fi
+    \protected@edef\listentry{\thetodonotesnumber: #2}%
     \addcontentsline{odo}{section}{\listentry}%
-  \else
-    \def\creationtag{}
-    \edef\creationdate{\zref@getcurrent{entrydate}}
-    \ifx\creationdate\empty\else\def\creationtag{\small~[Created: \creationdate]}\fi
-    % --- DEFINITIVE FIX: Force expansion before writing to file ---
-    \protected@edef\listentry{\creationtag~\thetodonotesnumber: #2}%
-    \addcontentsline{tdo}{section}{\listentry}%
-  \fi
 
-  \ifTodoIsDone
     \def\taskicon{\boxtimes}\def\taskcolor{TaskDone}%
   \else
+    % --- LOGIC FOR TODO TASKS LIST ---
+    \edef\creationdate{\zref@getcurrent{entrydate}}
+    \ifx\creationdate\lastTdoDate\else
+        \protected@edef\dateheadingtext{\noexpand\normalfont\noexpand\bfseries\noexpand\color{DateHeading}--- Created on \DTMlongdate{\creationdate} ---}
+        \addcontentsline{tdo}{subsection}{\dateheadingtext}
+        \xdef\lastTdoDate{\creationdate}
+    \fi
+    \protected@edef\listentry{\thetodonotesnumber: #2}%
+    \addcontentsline{tdo}{section}{\listentry}%
+
     \def\taskicon{\square}\def\taskcolor{\todocolor}%
   \fi
+
   \par\noindent\textbf{\thetodonotesnumber.}~{\Large\raisebox{-0.1em}{\textcolor{\taskcolor}{$\taskicon$}}}~\textcolor{\taskcolor}{\todotextformat{#2}}\plantag\par
 }
 
@@ -107,15 +119,22 @@
     \refstepcounter{todonotesnumber}\phantomsection
     \def\todocolor{Backlog}\def\todoplandate{}\setkeys{todo}{#1}%
     \def\plantag{}\def\datetag{}
+    
     \ifx\todoplandate\empty
-        \edef\creationdate{\zref@getcurrent{entrydate}}
-        \ifx\creationdate\empty\else\def\datetag{\small~[Created: \creationdate]}\fi
+        \edef\thedate{\zref@getcurrent{entrydate}}
+        \def\datetype{Created}
     \else
+        \edef\thedate{\todoplandate}
         \def\plantag{\textcolor{TaskPlan}{\small~[Plan: \todoplandate]}}%
-        \def\datetag{\textcolor{TaskPlan}{\small~[Plan: \todoplandate]}}%
+        \def\datetype{Planned for}
     \fi
-    % --- DEFINITIVE FIX: Force expansion before writing to file ---
-    \protected@edef\listentry{\datetag~\thetodonotesnumber: #2}%
+
+    \ifx\thedate\lastBgoDate\else
+        \protected@edef\dateheadingtext{\noexpand\normalfont\noexpand\bfseries\noexpand\color{DateHeading}--- \datetype \space \DTMlongdate{\thedate} ---}
+        \addcontentsline{bgo}{subsection}{\dateheadingtext}
+        \xdef\lastBgoDate{\thedate}
+    \fi
+    \protected@edef\listentry{\thetodonotesnumber: #2}%
     \addcontentsline{bgo}{section}{\listentry}%
     \par\noindent\textbf{\thetodonotesnumber.}~{\Large\raisebox{-0.1em}{\textcolor{\todocolor}{$\square$}}}~\textcolor{\todocolor}{#2}\plantag\par
 }
@@ -132,11 +151,12 @@
 \newcommand{\listofdonetodos}{\section*{List of Done Todos}\@starttoc{odo}}
 \newcommand{\listofbacklogs}{\section*{List of Backlog Tasks}\@starttoc{bgo}}
 
-% --- The robust command for date headings ---
+% --- The robust command for date headings in the main document ---
 \DeclareRobustCommand{\entrydate}[1]{%
     \edef\myDateString{\DTMweekdayname{#1}, \DTMlongdate{#1}}%
     \subsection*{\myDateString}%
     \zref@setcurrent{entrydate}{#1}%
+    \gdef\lastTdoDate{}\gdef\lastOdoDate{}\gdef\lastBgoDate{}%
 }
 
 \makeatother
@@ -144,12 +164,14 @@
 
 \begin{document}
 
-% --- NEW STRUCTURE: Lists at the beginning ---
-
-\chapter*{Journal Entries} 
-\input{entries/2025-10.tex} % Your entry file
-
+% --- Lists at the beginning ---
+\chapter*{Task Lists}
 \listoftodos
 \listofdonetodos
 \listofbacklogs
+
+% --- Journal entries follow ---
+\chapter*{Journal Entries} 
+\input{entries.tex} % Use your actual entry file
+
 \end{document}
