@@ -1,16 +1,5 @@
 \documentclass{tufte-book}
 
-% To make this example compilable, create a file named "entries.tex"
-% with the following content:
-%
-% \entrydate{2025-06-26}
-% \imp{Finish the report for the \textbf{board} meeting.}
-% \subtodo{Compile the quarterly sales data.}
-%
-% \entrydate{2025-06-27}
-% \todo[done]{Review the draft of the new website.}
-% \thought{Maybe we should add a FAQ section.}
-
 % --- FONT, ENCODING, AND LAYOUT PACKAGES ---
 \usepackage[T1]{fontenc}
 \usepackage[normalem]{ulem} 
@@ -21,7 +10,7 @@
 \usepackage{xargs}          
 
 % --- DATETIME & ZREF ---
-\usepackage[en-US, dateformat=long]{datetime2} 
+\usepackage[en-US]{datetime2} 
 \usepackage{zref-user}
 
 % --- HYPERREF SETUP ---
@@ -54,23 +43,17 @@
 \newcommand{\distraction}[1]{#1 \mn{distraction}}
 
 % =========================================================================
-% --- CORE TASK MANAGEMENT SYSTEM (v7.6 - Page Number Removal) ---
+% --- CORE TASK MANAGEMENT SYSTEM (FINAL VERSION WITH LINE-ITEM DATES) ---
 % =========================================================================
 
 \makeatletter
 
 % --- SETUP ---
 \newcounter{todonotesnumber}
-\newcounter{subtodocounter}
 \setcounter{tocdepth}{10} 
 \zref@newprop{entrydate}[unknown]{\textbf{??}}
 
-% --- Macros to track the last date printed in each list ---
-\gdef\lastTdoDate{}
-\gdef\lastOdoDate{}
-\gdef\lastBgoDate{}
-
-% --- KEY-VALUE OPTIONS AND STATE ---
+% --- KEY-VALUE OPTIONS FOR TASKS ---
 \SetupKeyvalOptions{family=todo,prefix=todo@}
 \define@key{todo}{color}{\def\todocolor{#1}}
 \newif\ifTodoIsDone
@@ -80,23 +63,12 @@
 \define@key{todo}{donedate}{\def\tododonedate{#1}}
 \define@key{todo}{plan}{\def\todoplandate{#1}} 
 
-\newcommand{\@resetTodoState}{%
-  \def\todocolor{black}%
-  \def\tododonedate{}%
-  \def\todoplandate{}%
-  \TodoIsDonefalse
-  \TodoIsStruckfalse
-}
-
 \newcommand{\todotextformat}[1]{#1}
 
 % --- MAIN TODO COMMAND ---
-% This command now writes hyperlinked entries to the .tdo, .odo, .bgo files
 \newcommand{\todo}[2][]{%
-  \refstepcounter{todonotesnumber}\phantomsection%
-  \hypertarget{todo-target-\thetodonotesnumber}{}% <--- Added hypertarget for links
-  \@resetTodoState
-  \setcounter{subtodocounter}{0}
+  \refstepcounter{todonotesnumber}\phantomsection
+  \def\todocolor{black}\def\tododonedate{}\def\todoplandate{}\TodoIsDonefalse\TodoIsStruckfalse
   \setkeys{todo}{#1}%
   
   \ifTodoIsStruck\renewcommand{\todotextformat}[1]{\sout{##1}}\else\renewcommand{\todotextformat}[1]{##1}\fi
@@ -107,29 +79,20 @@
       \ifx\todocolor\unmodified\def\todocolor{TaskPlan}\fi
   \fi
   
-  % Create the hyperlinked text for the list entry
-  \protected@edef\listentrytext{\noexpand\hyperlink{todo-target-\thetodonotesnumber}{\thetodonotesnumber: #2}}
-  
   \ifTodoIsDone
+    % --- LOGIC FOR DONE TASKS LIST ---
     \ifx\tododonedate\empty\edef\tododonedate{\zref@getcurrent{entrydate}}\fi
-    \ifx\tododonedate\lastOdoDate\else
-        \edef\myFormattedDate{\DTMlongdate{\tododonedate}}%
-        \protected@edef\dateheadingtext{\noexpand\normalfont\noexpand\bfseries\noexpand\color{DateHeading}--- Completed on \myFormattedDate ---}%
-        \addcontentsline{odo}{subsection}{\dateheadingtext}%
-        \xdef\lastOdoDate{\tododonedate}%
-    \fi
-    \addcontentsline{odo}{section}{\listentrytext}%
+    % Prepend the date to the list entry; no more subsection headings.
+    \protected@edef\listentry{\textcolor{DateHeading}{[completed: \DTMlongdate{\tododonedate}]} \thetodonotesnumber: #2}%
+    \addcontentsline{odo}{section}{\listentry}%
 
     \def\taskicon{\boxtimes}\def\taskcolor{TaskDone}%
   \else
+    % --- LOGIC FOR TODO TASKS LIST ---
     \edef\creationdate{\zref@getcurrent{entrydate}}
-    \ifx\creationdate\lastTdoDate\else
-        \edef\myFormattedDate{\DTMlongdate{\creationdate}}%
-        \protected@edef\dateheadingtext{\noexpand\normalfont\noexpand\bfseries\noexpand\color{DateHeading}--- Created on \myFormattedDate ---}%
-        \addcontentsline{tdo}{subsection}{\dateheadingtext}%
-        \xdef\lastTdoDate{\creationdate}%
-    \fi
-    \addcontentsline{tdo}{section}{\listentrytext}%
+    % Prepend the date to the list entry; no more subsection headings.
+    \protected@edef\listentry{\textcolor{DateHeading}{[created: \DTMlongdate{\creationdate}]} \thetodonotesnumber: #2}%
+    \addcontentsline{tdo}{section}{\listentry}%
 
     \def\taskicon{\square}\def\taskcolor{\todocolor}%
   \fi
@@ -139,83 +102,63 @@
 
 % --- Backlog command with list date logic ---
 \newcommand{\backlog}[2][]{%
-    \refstepcounter{todonotesnumber}\phantomsection%
-    \hypertarget{todo-target-\thetodonotesnumber}{}% <--- Added hypertarget for links
-    \@resetTodoState \setkeys{todo}{color=Backlog, #1}%
-    \setcounter{subtodocounter}{0}%
-    \def\plantag{}
+    \refstepcounter{todonotesnumber}\phantomsection
+    \def\todocolor{Backlog}\def\todoplandate{}\setkeys{todo}{#1}%
+    \def\plantag{}\def\datetag{}
+    \def\dateprefix{}%
     
     \ifx\todoplandate\empty
-        \edef\thedate{\zref@getcurrent{entrydate}}%
-        \def\datetype{Created}%
+        \edef\thedate{\zref@getcurrent{entrydate}}
+        \protected@edef\dateprefix{\textcolor{DateHeading}{[created: \DTMlongdate{\thedate}]}}
     \else
-        \edef\thedate{\todoplandate}%
+        \edef\thedate{\todoplandate}
         \def\plantag{\textcolor{TaskPlan}{\small~[Plan: \todoplandate]}}%
-        \def\datetype{Planned for}%
+        \protected@edef\dateprefix{\textcolor{DateHeading}{[plan: \DTMlongdate{\thedate}]}}
     \fi
 
-    % Create the hyperlinked text for the list entry
-    \protected@edef\listentrytext{\noexpand\hyperlink{todo-target-\thetodonotesnumber}{\thetodonotesnumber: #2}}
-
-    \ifx\thedate\lastBgoDate\else
-        \edef\myFormattedDate{\DTMlongdate{\thedate}}%
-        \protected@edef\dateheadingtext{\noexpand\normalfont\noexpand\bfseries\noexpand\color{DateHeading}--- \datetype\space on \myFormattedDate ---}%
-        \addcontentsline{bgo}{subsection}{\dateheadingtext}%
-        \xdef\lastBgoDate{\thedate}%
-    \fi
-    \addcontentsline{bgo}{section}{\listentrytext}%
+    % Prepend the date to the list entry; no more subsection headings.
+    \protected@edef\listentry{\dateprefix\space \thetodonotesnumber: #2}%
+    \addcontentsline{bgo}{section}{\listentry}%
+    
     \par\noindent\textbf{\thetodonotesnumber.}~{\Large\raisebox{-0.1em}{\textcolor{\todocolor}{$\square$}}}~\textcolor{\todocolor}{#2}\plantag\par
 }
 
-% --- Helper commands (Unchanged) ---
-\newcommand{\imp}[2][]{\todo[color=TaskImp, #1]{#2}}
-\newcommand{\now}[2][]{\imp[#1]{#2}}
-\newcommandx{\subtodo}[2][1=]{%
-    \refstepcounter{subtodocounter}%
-    \TodoIsDonefalse\TodoIsStruckfalse%
-    \setkeys{todo}{#1}%
-    \ifTodoIsStruck\def\subtodo@format##1{\sout{##1}}\else\def\subtodo@format##1{##1}\fi
-    \ifTodoIsDone
-        \def\subicon{\checkmark}%
-        \def\subcolor{SubTaskDone}%
-    \else
-        \def\subicon{\square}%
-        \def\subcolor{Task}%
-    \fi
-    \par\noindent
-    \hspace{2.5em}%
-    \textbf{\thetodonotesnumber.\thesubtodocounter.}~%
-    {\small\raisebox{0.05em}{\textcolor{\subcolor}{$\subicon$}}}~%
-    \textcolor{\subcolor}{\subtodo@format{#2}}%
-    \par
-}
-\newcommand{\note}[1]{\par\noindent\hspace{2.5em}\textcolor{TaskNote}{-- \textit{#1}}\par}      
-\newcommand{\thought}[1]{\par\noindent\hspace{2.5em}\textcolor{TaskThought}{-- \textit{#1}}\par} 
+% --- NEW COMMAND: A simple task with no special category ---
+\newcommand{\newtask}[1]{\todo{#1}}
 
-% --- COMMANDS TO GENERATE LISTS (REWRITTEN) ---
-\newcommand{\@listtasks}[1]{%
-  \begingroup % Start a local group to keep redefinitions from leaking
-    % Redefine how "subsection" level entries (our date headings) are formatted.
-    % ##1 is the text, ##2 is the page number (which we ignore).
-    % We add some vertical space to separate the date groups.
-    \def\l@subsection##1##2{\par\addvspace{0.5em}\noindent##1\par\nopagebreak}%
-    % Redefine how "section" level entries (our tasks) are formatted.
-    % ##1 is the hyperlinked text, ##2 is the page number (which we ignore).
-    \def\l@section##1##2{\par\noindent##1\par}%
-    % Now, process the file with our custom formatting.
-    \@starttoc{#1}%
-  \endgroup % End the local group
+% --- Helper commands (unchanged) ---
+\newcommand{\imptodo}[2][]{\todo[color=TaskImp, #1]{#2}}
+\newcommand{\now}[2][]{\imptodo[#1]{#2}}
+\newcommandx{\subtodo}[2][1=]{\TodoIsDonefalse\setkeys{todo}{#1}\ifTodoIsDone\def\subicon{\checkmark}\def\subcolor{SubTaskDone}\else\def\subicon{\square}\def\subcolor{Task}\fi\par\noindent\hspace{2.5em}{\small\raisebox{0.05em}{\textcolor{\subcolor}{$\subicon$}}}~\textcolor{\subcolor}{#2}\par}
+\newcommand{\tasknote}[1]{\par\noindent\hspace{2.5em}\textcolor{TaskNote}{-- \textit{#1}}\par}
+\newcommand{\taskthought}[1]{\par\noindent\hspace{2.5em}\textcolor{TaskThought}{-- \textit{#1}}\par}
+
+% --- COMMANDS TO GENERATE LISTS (SIMPLIFIED) ---
+\newcommand{\generatelist}[2]{%
+    \section*{#1}%
+    \begingroup
+    % All entries are now 'section' level, so we only need to define this.
+    \renewcommand*{\l@section}[2]{%
+        \ifnum 1>\c@tocdepth \else
+            \par\addvspace{2pt} % Add a little space between entries
+            \noindent\leftskip=0em ##1\par % No indent needed
+        \fi
+    }
+    \@starttoc{#2}%
+    \endgroup
 }
 
-\newcommand{\listoftodos}{\section*{List of Todos}\@listtasks{tdo}}
-\newcommand{\listofdonetodos}{\section*{List of Done Todos}\@listtasks{odo}}
-\newcommand{\listofbacklogs}{\section*{List of Backlog Tasks}\@listtasks{bgo}}
+\newcommand{\listoftodos}{\generatelist{{\bf List of Todos}}{tdo}}
+\newcommand{\listofdonetodos}{\generatelist{{\bf List of Done Todos}}{odo}}
+	\newcommand{\listofbacklogs}{\generatelist{{\bf List of Backlog Tasks}}{bgo}}
 
-% --- The robust command for date headings in the main document ---
-\DeclareRobustCommand{\entrydate}[1]{%
-    \subsection*{\DTMweekdayname{#1}, \DTMlongdate{#1}}%
+
+% --- Use a unique command name for journal date headings ---
+\DeclareRobustCommand{\journaldate}[1]{%
+    % \edef\myDateString{\DTMweekdayname{#1}, \DTMlongdate{#1}}%
+    \edef\myDateString{\DTMweekdayname{#1}}%
+	\subsection*{\textbf{\myDateString}}%
     \zref@setcurrent{entrydate}{#1}%
-    \gdef\lastTdoDate{}\gdef\lastOdoDate{}\gdef\lastBgoDate{}%
 }
 
 \makeatother
@@ -223,12 +166,15 @@
 
 \begin{document}
 
+% --- Lists at the beginning ---
 \chapter*{Task Lists}
 \listoftodos
 \listofdonetodos
 \listofbacklogs
 
+% --- Journal entries follow ---
 \chapter*{Journal Entries} 
-\input{entries.tex}
+
+\input{entries.tex} 
 
 \end{document}
