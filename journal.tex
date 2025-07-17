@@ -1,204 +1,170 @@
-\documentclass{tufte-book}
+\documentclass{tufte-book} % 'notoc' option is removed
 
-% --- FONT, ENCODING, AND LAYOUT PACKAGES ---
-\usepackage[T1]{fontenc}
-\usepackage[normalem]{ulem} 
-\usepackage{soul}           
-\usepackage{arev}           
-\usepackage{amssymb}        
+% --- Packages ---
+\usepackage[normalem]{ulem}
 \usepackage{xcolor}
-\usepackage{xargs}          
-
-% --- DATETIME & ZREF ---
-% \usepackage[en-US, style=dateformat=long]{datetime2} 
-\usepackage[en-US]{datetime2} 
-\usepackage{zref-user}
-
-% --- HYPERREF SETUP ---
+\usepackage{soul}
+\usepackage{xargs}
+\usepackage{etoolbox}
 \usepackage{hyperref}
+\usepackage{amssymb} % For \checkmark
+
+% --- Global Document Setup ---
+% This is the correct way to hide the main ToC without breaking custom lists
+\setcounter{tocdepth}{-1} 
+
+% --- Color Setup ---
+\definecolor{TaskDone}{HTML}{428BCA}     % Blue for Done
+\definecolor{SubTaskDone}{HTML}{407076}  % Dark Teal for Done Subtask
+\definecolor{SubTask}{HTML}{333B3E}      % Dark Gray for Subtask
+\definecolor{TaskBacklog}{HTML}{4682B4}  % Steel Blue for Backlog
+\definecolor{TaskDefault}{HTML}{D9534F}  % Default color for a new todo (Important Red)
+
 \hypersetup{
     colorlinks=true,
     linkcolor=blue,
-    filecolor=magenta,      
+    filecolor=magenta,
     urlcolor=cyan,
     bookmarksdepth=subsection,
 }
 
-% --- CUSTOM COLOR DEFINITIONS ---
-\definecolor{TaskImp}{HTML}{D9534F}     
-\definecolor{TaskDone}{HTML}{428BCA}    
-\definecolor{TaskNote}{HTML}{5BC0DE}    
-\definecolor{TaskThought}{HTML}{777777} 
-\definecolor{SubTaskDone}{HTML}{407076} 
-\definecolor{Task}{HTML}{333B3E}     
-\definecolor{Backlog}{HTML}{5CB85C}     
-\definecolor{TaskPlan}{HTML}{8A2BE2}
-\definecolor{DateHeading}{HTML}{666666}
+% --- Counters ---
+\newcounter{tasknumber}
+\newcounter{subtasknumber}[tasknumber]
+\renewcommand{\thesubtasknumber}{\thetasknumber.\arabic{subtasknumber}}
 
-% --- TUFTE MARGINNOTE COMMANDS (Unchanged) ---
-\newcommand{\nuni}{\marginnote{--- Not Urgent, Not Important}}
-\newcommand{\uni}{\marginnote{--- Urgent, Not Important}}
-\newcommand{\nui}{\marginnote{--- Not Urgent, Important}}
-\newcommand{\ui}{\marginnote{--- Urgent, Important}}
-\newcommand{\mn}[1]{\marginnote{--- #1}}
-\newcommand{\distraction}[1]{#1 \mn{distraction}}
-
-% =========================================================================
-% --- CORE TASK MANAGEMENT SYSTEM (DEFINITIVE CORRECTED VERSION) ---
-% =========================================================================
-
+% --- Key-Value System for Task Options ---
 \makeatletter
+\usepackage{keyval}
 
-% --- SETUP ---
-\newcounter{todonotesnumber}
-\setcounter{tocdepth}{10} 
-\zref@newprop{entrydate}[unknown]{\textbf{??}}
+\newif\ifTaskIsDone
+\define@key{task}{done}[true]{\TaskIsDonetrue}
+\define@key{task}{color}{\def\taskcolor{#1}}
 
-% --- Macros to track the last date printed in each list ---
-\newcommand{\lastTdoDate}{}
-\newcommand{\lastOdoDate}{}
-\newcommand{\lastBgoDate}{}
+% --- Master Task Creation Commands (Internal) ---
+% An internal command to handle the logic for all main tasks
+% CORRECTED: Now takes list extension and color as separate arguments
+\newcommand{\@createmaintask}[4][]{%
+    % #1: options, #2: list file extension, #3: display color, #4: text
+    \bgroup 
+    \TaskIsDonefalse
+    \def\taskcolor{#3} % Use argument #3 for color
+    \setkeys{task}{#1} 
 
-% --- KEY-VALUE OPTIONS FOR TASKS ---
-\SetupKeyvalOptions{family=todo,prefix=todo@}
-\define@key{todo}{color}{\def\todocolor{#1}}
-\newif\ifTodoIsDone
-\define@key{todo}{done}[true]{\TodoIsDonetrue}
-\newif\ifTodoIsStruck
-\define@key{todo}{strike}[true]{\TodoIsStrucktrue}
-\define@key{todo}{donedate}{\def\tododonedate{#1}}
-\define@key{todo}{plan}{\def\todoplandate{#1}} 
+    \refstepcounter{tasknumber}
+    \phantomsection
+    \expandafter\gdef\csname tasktext@\thetasknumber\endcsname{#4}
 
-\newcommand{\todotextformat}[1]{#1}
-
-% --- MAIN TODO COMMAND ---
-\newcommand{\todo}[2][]{%
-  \refstepcounter{todonotesnumber}\phantomsection
-  \def\todocolor{black}\def\tododonedate{}\def\todoplandate{}\TodoIsDonefalse\TodoIsStruckfalse
-  \setkeys{todo}{#1}%
-  
-  \ifTodoIsStruck\renewcommand{\todotextformat}[1]{\sout{##1}}\else\renewcommand{\todotextformat}[1]{##1}\fi
-  \def\plantag{}
-  
-  \ifx\todoplandate\empty\else
-      \def\plantag{\textcolor{TaskPlan}{\small~[Plan: \todoplandate]}}%
-      \ifx\todocolor\unmodified\def\todocolor{TaskPlan}\fi
-  \fi
-  
-  \ifTodoIsDone
-    % --- LOGIC FOR DONE TASKS LIST ---
-    \ifx\tododonedate\empty\edef\tododonedate{\zref@getcurrent{entrydate}}\fi
-    \ifx\tododonedate\lastOdoDate\else
-        % FIX: Write ONLY plain text to the list file.
-        \protected@edef\dateheadingtext{--- Completed on \DTMlongdate{\tododonedate} ---}
-        \addcontentsline{odo}{subsection}{\dateheadingtext}
-        \xdef\lastOdoDate{\tododonedate}
-    \fi
-    \protected@edef\listentry{\thetodonotesnumber: #2}%
-    \addcontentsline{odo}{section}{\listentry}%
-    \def\taskicon{\boxtimes}\def\taskcolor{TaskDone}%
-  \else
-    % --- LOGIC FOR TODO TASKS LIST ---
-    \edef\creationdate{\zref@getcurrent{entrydate}}
-    \ifx\creationdate\lastTdoDate\else
-        % FIX: Write ONLY plain text to the list file.
-        \protected@edef\dateheadingtext{--- Created on \DTMlongdate{\creationdate} ---}
-        \addcontentsline{tdo}{subsection}{\dateheadingtext}
-        \xdef\lastTdoDate{\creationdate}
-    \fi
-    \protected@edef\listentry{\thetodonotesnumber: #2}%
-    \addcontentsline{tdo}{section}{\listentry}%
-    \def\taskicon{\square}\def\taskcolor{\todocolor}%
-  \fi
-
-  \par\noindent\textbf{\thetodonotesnumber.}~{\Large\raisebox{-0.1em}{\textcolor{\taskcolor}{$\taskicon$}}}~\textcolor{\taskcolor}{\todotextformat{#2}}\plantag\par
-}
-
-% --- Backlog command with list date logic ---
-\newcommand{\backlog}[2][]{%
-    \refstepcounter{todonotesnumber}\phantomsection
-    \def\todocolor{Backlog}\def\todoplandate{}\setkeys{todo}{#1}%
-    \def\plantag{}\def\datetag{}
-    
-    \ifx\todoplandate\empty
-        \edef\thedate{\zref@getcurrent{entrydate}}
-        \def\datetype{Created}
+    % CORRECTED: Always writes to the correct list file from argument #2
+    \ifTaskIsDone
+        \addcontentsline{odo}{section}{\protect\numberline{\thetasknumber} #4}
     \else
-        \edef\thedate{\todoplandate}
-        \def\plantag{\textcolor{TaskPlan}{\small~[Plan: \todoplandate]}}%
-        \def\datetype{Planned for}
+        \addcontentsline{#2}{section}{\protect\numberline{\thetasknumber} #4}
     \fi
 
-    \ifx\thedate\lastBgoDate\else
-        % FIX: Write ONLY plain text to the list file.
-        \protected@edef\dateheadingtext{--- \datetype \space \DTMlongdate{\thedate} ---}
-        \addcontentsline{bgo}{subsection}{\dateheadingtext}
-        \xdef\lastBgoDate{\thedate}
+    % Display the task in the document
+    \par\noindent
+    \ifTaskIsDone
+        \textcolor{TaskDone}{\Large\raisebox{-0.1em}{$\checkmark$}~\textbf{\thetasknumber:} #4}%
+    \else
+        \textcolor{\taskcolor}{\Large\raisebox{-0.1em}{$\square$}~\textbf{\thetasknumber:} #4}%
     \fi
-    \protected@edef\listentry{\thetodonotesnumber: #2}%
-    \addcontentsline{bgo}{section}{\listentry}%
-    \par\noindent\textbf{\thetodonotesnumber.}~{\Large\raisebox{-0.1em}{\textcolor{\todocolor}{$\square$}}}~\textcolor{\todocolor}{#2}\plantag\par
+    \par\vspace{1mm}
+    \egroup
 }
 
-% --- Helper commands (unchanged) ---
-\newcommand{\imptodo}[2][]{\todo[color=TaskImp, #1]{#2}}
-\newcommand{\now}[2][]{\imptodo[#1]{#2}}
-\newcommandx{\subtodo}[2][1=]{\TodoIsDonefalse\setkeys{todo}{#1}\ifTodoIsDone\def\subicon{\checkmark}\def\subcolor{SubTaskDone}\else\def\subicon{\square}\def\subcolor{Task}\fi\par\noindent\hspace{2.5em}{\small\raisebox{0.05em}{\textcolor{\subcolor}{$\subicon$}}}~\textcolor{\subcolor}{#2}\par}
-\newcommand{\tasknote}[1]{\par\noindent\hspace{2.5em}\textcolor{TaskNote}{-- \textit{#1}}\par}
-\newcommand{\taskthought}[1]{\par\noindent\hspace{2.5em}\textcolor{TaskThought}{-- \textit{#1}}\par}
+% An internal command to handle the logic for all sub-tasks (This was already correct)
+\newcommand{\@createsubtask}[3][]{%
+    % #1: options, #2: list file extension, #3: text
+    \bgroup
+    \TaskIsDonefalse
+    \def\taskcolor{SubTask}
+    \setkeys{task}{#1}
 
-% --- COMMANDS TO GENERATE LISTS ---
-\newcommand{\generatelist}[2]{%
-    \section*{#1}%
-    \begingroup
-    % For task items (level 1)
-    \renewcommand*{\l@section}[2]{%
-        \ifnum 1>\c@tocdepth \else
-            \par\noindent\leftskip=2.5em ##1\par
-        \fi
-    }
-    % For date headings (level 2)
-    \renewcommand*{\l@subsection}[2]{%
-        \ifnum 2>\c@tocdepth \else
-            \addvspace{0.5\baselineskip}\par\noindent
-            % FIX: Apply formatting HERE, during typesetting.
-            {\normalfont\bfseries\color{DateHeading}##1}\par
-        \fi
-    }
-    \@starttoc{#2}%
-    \endgroup
+    \refstepcounter{subtasknumber}
+    \phantomsection
+    \expandafter\gdef\csname tasktext@\thesubtasknumber\endcsname{#3}
+
+    % Write to the correct list file
+    \ifTaskIsDone
+        \addcontentsline{odo}{subsection}{\protect\numberline{\thesubtasknumber} #3}
+    \else
+        \addcontentsline{#2}{subsection}{\protect\numberline{\thesubtasknumber} #3}
+    \fi
+
+    % Display the sub-task
+    \par\noindent\hspace{2em}
+    \ifTaskIsDone
+        \textcolor{SubTaskDone}{\raisebox{-0.1em}{$\checkmark$}~\textbf{\thesubtasknumber:} #3}%
+    \else
+        \textcolor{\taskcolor}{\raisebox{-0.1em}{$\square$}~\textbf{\thesubtasknumber:} #3}%
+    \fi
+    \par\vspace{1mm}
+    \egroup
 }
 
-\newcommand{\listoftodos}{\generatelist{List of Todos}{tdo}}
-\newcommand{\listofdonetodos}{\generatelist{List of Done Todos}{odo}}
-\newcommand{\listofbacklogs}{\generatelist{List of Backlog Tasks}{bgo}}
+% --- User-Facing Commands ---
+% CORRECTED: Now passes the list extension ('tdo'/'bgo') and color separately
+\newcommand{\todo}[2][]{\@createmaintask[#1]{tdo}{TaskDefault}{#2}}
+\newcommand{\subtodo}[2][]{\@createsubtask[#1]{tdo}{#2}}
+\newcommand{\backlog}[2][]{\@createmaintask[#1]{bgo}{TaskBacklog}{#2}}
+\newcommand{\subbacklog}[2][]{\@createsubtask[#1]{bgo}{#2}}
 
-
-% --- FIX: Use a unique command name to avoid package conflicts ---
-\DeclareRobustCommand{\journaldate}[1]{%
-    % \edef\myDateString{\DTMweekdayname{#1}, \DTMlongdate{#1}}%
-    \edef\myDateString{\DTMweekdayname{#1}}%
-    \subsection*{\myDateString}%
-    \zref@setcurrent{entrydate}{#1}%
-    \gdef\lastTdoDate{}\gdef\lastOdoDate{}\gdef\lastBgoDate{}%
+% --- Reprint Command ---
+\newcommand{\reprinttask}[1]{%
+  \ifcsdef{tasktext@#1}{\textbf{Task~#1:}~\csuse{tasktext@#1}}{\textcolor{red}{[Unknown task #1]}}%
 }
 
+% --- "List of..." Commands ---
+\newcommand{\listoftodos}{%
+  \bgroup
+  \renewcommand*\l@section[2]{\par\noindent\textcolor{TaskDefault}{\textbf{##1}~~##2}\par}
+  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}\textcolor{SubTask}{\textbf{##1}~~##2}\par}
+  \chapter*{List of Todos}
+  \@starttoc{tdo}
+  \egroup
+}
+
+\newcommand{\listofdonetodos}{%
+  \bgroup
+  \renewcommand*\l@section[2]{\par\noindent\textcolor{TaskDone}{\textbf{##1}~~##2}\par}
+  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}\textcolor{SubTaskDone}{\textbf{##1}~~##2}\par}
+  \chapter*{List of Done Tasks}
+  \@starttoc{odo}
+  \egroup
+}
+
+\newcommand{\listofbacklogs}{%
+  \bgroup
+  \renewcommand*\l@section[2]{\par\noindent\textcolor{TaskBacklog}{\textbf{##1}~~##2}\par}
+  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}\textcolor{SubTask}{\textbf{##1}~~##2}\par}
+  \chapter*{List of Backlogs}
+  \@starttoc{bgo}
+  \egroup
+}
 \makeatother
-% =========================================================================
 
+
+% --- Document Start ---
 \begin{document}
 
-% --- Journal entries follow ---
-\chapter*{Journal Entries} 
+\chapter{Project Plan}
 
-% To make this example fully compilable, a dummy entries.tex is created.
-% You must use \journaldate instead of \entrydate in your actual file.
-\input{entries.tex} 
-% --- Lists at the beginning ---
-\chapter*{Task Lists}
+\input{entries.tex}
+\newpage
 \listoftodos
 \listofdonetodos
 \listofbacklogs
 
+\newpage
+\textbf{References to Tasks:}
+\begin{itemize}
+  \item Reprinting a main task: \reprinttask{1}
+  \item Reprinting a subtask: \reprinttask{1.1}
+  \item Reprinting a done task: \reprinttask{3}
+  \item Reprinting a backlog item: \reprinttask{4}
+  \item Reprinting a sub-backlog: \reprinttask{4.2}
+  \item Reprinting the last task: \reprinttask{5}
+\end{itemize}
 
 \end{document}
