@@ -1,4 +1,4 @@
-\documentclass{tufte-book} % 'notoc' option is removed
+\documentclass{tufte-book}
 
 % --- Packages ---
 \usepackage[normalem]{ulem}
@@ -10,10 +10,9 @@
 \usepackage{amssymb} % For \checkmark
 
 % --- Global Document Setup ---
-% This is the correct way to hide the main ToC without breaking custom lists
 \setcounter{tocdepth}{-1} 
 
-% --- Color Setup (Cleaned and Corrected) ---
+% --- Color Setup ---
 \definecolor{TaskImp}{HTML}{D9534F}      % Red for Important
 \definecolor{TaskDone}{HTML}{428BCA}     % Blue for Done
 \definecolor{SubTaskDone}{HTML}{407076}  % Dark Teal for Done Subtask
@@ -21,7 +20,7 @@
 \definecolor{TaskThought}{HTML}{777777}  % Gray for Thought
 \definecolor{SubTask}{HTML}{333B3E}      % Dark Gray for Subtask
 \definecolor{TaskBacklog}{HTML}{4682B4}  % Steel Blue for Backlog
-\definecolor{TaskDefault}{HTML}{333B3E}  % CORRECTED: Default color is now visible Dark Gray
+\definecolor{TaskDefault}{HTML}{333B3E}  % Default color is now visible Dark Gray
 
 \hypersetup{
     colorlinks=true,
@@ -45,96 +44,8 @@
 \define@key{task}{color}{\def\taskcolor{#1}}
 
 % --- Master Task Creation Commands (Internal) ---
-% An internal command to handle the logic for all main tasks
-\newcommand{\@createmaintask}[4][]{%
-    % #1: options, #2: list file extension, #3: display color, #4: text
-    \bgroup 
-    \TaskIsDonefalse
-    \def\taskcolor{#3} % Use argument #3 for color
-    \setkeys{task}{#1} 
 
-    \refstepcounter{tasknumber}
-    \phantomsection
-    \expandafter\gdef\csname tasktext@\thetasknumber\endcsname{#4}
-
-    % Always writes to the correct list file from argument #2
-    \ifTaskIsDone
-        \addcontentsline{odo}{section}{\protect\numberline{\thetasknumber} #4}
-    \else
-        \addcontentsline{#2}{section}{\protect\numberline{\thetasknumber} #4}
-    \fi
-
-    % Display the task in the document
-    \par\noindent
-    \ifTaskIsDone
-        \textcolor{TaskDone}{\Large\raisebox{-0.1em}{$\checkmark$}~\textbf{\thetasknumber:} #4}%
-    \else
-        \textcolor{\taskcolor}{\Large\raisebox{-0.1em}{$\square$}~\textbf{\thetasknumber:} #4}%
-    \fi
-    \par\vspace{1mm}
-    \egroup
-}
-
-% An internal command to handle the logic for all sub-tasks
-\newcommand{\@createsubtask}[3][]{%
-    % #1: options, #2: list file extension, #3: text
-    \bgroup
-    \TaskIsDonefalse
-    \def\taskcolor{SubTask}
-    \setkeys{task}{#1}
-
-    \refstepcounter{subtasknumber}
-    \phantomsection
-    \expandafter\gdef\csname tasktext@\thesubtasknumber\endcsname{#3}
-
-    % Write to the correct list file
-    \ifTaskIsDone
-        \addcontentsline{odo}{subsection}{\protect\numberline{\thesubtasknumber} #3}
-    \else
-        \addcontentsline{#2}{subsection}{\protect\numberline{\thesubtasknumber} #3}
-    \fi
-
-    % Display the sub-task
-    \par\noindent\hspace{2em}
-    \ifTaskIsDone
-        \textcolor{SubTaskDone}{\raisebox{-0.1em}{$\checkmark$}~\textbf{\thesubtasknumber:} #3}%
-    \else
-        \textcolor{\taskcolor}{\raisebox{-0.1em}{$\square$}~\textbf{\thesubtasknumber:} #3}%
-    \fi
-    \par\vspace{1mm}
-    \egroup
-}
-
-% --- User-Facing Commands ---
-\newcommand{\imp}[2][]{\@createmaintask[#1]{tdo}{TaskImp}{#2}}       % <-- NEW: Important (Red) Task
-\newcommand{\todo}[2][]{\@createmaintask[#1]{tdo}{TaskDefault}{#2}} % <-- Now uses visible default color
-\newcommand{\subtodo}[2][]{\@createsubtask[#1]{tdo}{#2}}
-\newcommand{\backlog}[2][]{\@createmaintask[#1]{bgo}{TaskBacklog}{#2}}
-\newcommand{\subbacklog}[2][]{\@createsubtask[#1]{bgo}{#2}}
-\newcommand{\note}[1]{\item[--] \textit{\textcolor{TaskNote}{#1}}}
-\newcommand{\thought}[1]{\item[--] \textit{\textcolor{TaskThought}{#1}}}
-
-
-% --- Reprint Command ---
-\newcommand{\reprinttask}[1]{%
-  \ifcsdef{tasktext@#1}{\textbf{Task~#1:}~\csuse{tasktext@#1}}{\textcolor{red}{[Unknown task #1]}}%
-}
-
-% --- "List of..." Commands ---
-% I added the correct color for \imp in the list of todos
-\newcommand{\listoftodos}{%
-  \bgroup
-  % The \l@section command needs to know the color. We'll pass it.
-  % We modify addcontentsline to include the color command.
-  \renewcommand*\l@section[2]{\par\noindent{\textbf{##1}~~##2}\par} % Color is now passed in the entry
-  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}\textcolor{SubTask}{\textbf{##1}~~##2}\par}
-  \chapter*{List of Todos}
-  \@starttoc{tdo}
-  \egroup
-}
-
-% To make the list colors work, we must pass the color command into the .tdo file
-% We redefine the internal command slightly.
+% MODIFIED: Added \label to create a hyperlink anchor.
 \renewcommand{\@createmaintask}[4][]{%
     \bgroup 
     \TaskIsDonefalse
@@ -142,11 +53,11 @@
     \setkeys{task}{#1} 
     \refstepcounter{tasknumber}
     \phantomsection
+    \label{task:\thetasknumber} % <-- ADDED: Creates the target for the hyperlink
     \expandafter\gdef\csname tasktext@\thetasknumber\endcsname{#4}
     \ifTaskIsDone
         \addcontentsline{odo}{section}{\protect\numberline{\thetasknumber} #4}
     \else
-        % THIS IS THE KEY CHANGE: Pass the color command into the list file
         \addcontentsline{#2}{section}{\protect\numberline{\thetasknumber} \textcolor{#3}{#4}}
     \fi
     \par\noindent
@@ -159,6 +70,62 @@
     \egroup
 }
 
+% MODIFIED: Added \label to create a hyperlink anchor for subtasks.
+\renewcommand{\@createsubtask}[3][]{%
+    \bgroup
+    \TaskIsDonefalse
+    \def\taskcolor{SubTask}
+    \setkeys{task}{#1}
+
+    \refstepcounter{subtasknumber}
+    \phantomsection
+    \label{task:\thesubtasknumber} % <-- ADDED: Creates the target for the subtask hyperlink
+    \expandafter\gdef\csname tasktext@\thesubtasknumber\endcsname{#3}
+
+    \ifTaskIsDone
+        \addcontentsline{odo}{subsection}{\protect\numberline{\thesubtasknumber} #3}
+    \else
+        \addcontentsline{#2}{subsection}{\protect\numberline{\thesubtasknumber} #3}
+    \fi
+
+    \par\noindent\hspace{2em}
+    \ifTaskIsDone
+        \textcolor{SubTaskDone}{\raisebox{-0.1em}{$\checkmark$}~\textbf{\thesubtasknumber:} #3}%
+    \else
+        \textcolor{\taskcolor}{\raisebox{-0.1em}{$\square$}~\textbf{\thesubtasknumber:} #3}%
+    \fi
+    \par\vspace{1mm}
+    \egroup
+}
+
+% --- User-Facing Commands ---
+\newcommand{\imp}[2][]{\@createmaintask[#1]{tdo}{TaskImp}{#2}}       
+\newcommand{\todo}[2][]{\@createmaintask[#1]{tdo}{TaskDefault}{#2}} 
+\newcommand{\subtodo}[2][]{\@createsubtask[#1]{tdo}{#2}}
+\newcommand{\backlog}[2][]{\@createmaintask[#1]{bgo}{TaskBacklog}{#2}}
+\newcommand{\subbacklog}[2][]{\@createsubtask[#1]{bgo}{#2}}
+\newcommand{\note}[1]{\item[--] \textit{\textcolor{TaskNote}{#1}}}
+\newcommand{\thought}[1]{\item[--] \textit{\textcolor{TaskThought}{#1}}}
+
+
+% --- Reprint Command ---
+
+% MODIFIED: Wrapped the output in \hyperref to make it a clickable link.
+\renewcommand{\reprinttask}[1]{%
+  \ifcsdef{tasktext@#1}%
+    {\hyperref[task:#1]{\textbf{Task~#1:}~\csuse{tasktext@#1}}}% The entire text is now a link
+    {\textcolor{red}{[Unknown task #1]}}%
+}
+
+% --- "List of..." Commands ---
+\newcommand{\listoftodos}{%
+  \bgroup
+  \renewcommand*\l@section[2]{\par\noindent{\textbf{##1}~~##2}\par}
+  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}\textcolor{SubTask}{\textbf{##1}~~##2}\par}
+  \chapter*{List of Todos}
+  \@starttoc{tdo}
+  \egroup
+}
 
 \newcommand{\listofdonetodos}{%
   \bgroup
@@ -171,7 +138,7 @@
 
 \newcommand{\listofbacklogs}{%
   \bgroup
-  \renewcommand*\l@section[2]{\par\noindent{\textbf{##1}~~##2}\par} % Color passed in entry
+  \renewcommand*\l@section[2]{\par\noindent{\textbf{##1}~~##2}\par}
   \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}\textcolor{SubTask}{\textbf{##1}~~##2}\par}
   \chapter*{List of Backlogs}
   \@starttoc{bgo}
@@ -183,23 +150,7 @@
 % --- Document Start ---
 \begin{document}
 
-\chapter{Project Plan}
-
 \input{entries.tex}
 
-\newpage
-\listoftodos
-\listofdonetodos
-\listofbacklogs
-
-% \newpage
-% \textbf{References to Tasks:}
-% \begin{itemize}
-%   \item Reprinting an important task: \reprinttask{1}
-%   \item Reprinting a subtask: \reprinttask{1.1}
-%   \item Reprinting a done task: \reprinttask{3}
-%   \item Reprinting a backlog item: \reprinttask{4}
-%   \item Reprinting the last important task: \reprinttask{5}
-% \end{itemize}
-
+\chapter{Project Plan}
 \end{document}
